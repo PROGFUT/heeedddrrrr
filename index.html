@@ -1,0 +1,97 @@
+<!doctype html><html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Серце з тексту</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* Layout: full-screen black canvas, heart written out in text; small text field pinned at the bottom */
+  :root { --bg:#000; --ink:#ffb3c1; --muted:#7a5560; --line:#2a1a1f; color-scheme: dark; }
+  html, body { height: 100%; -webkit-text-size-adjust: 100%; }
+  html,body{margin:0} body { background: var(--bg); color: var(--ink); font-family: Inter, system-ui, sans-serif; overflow: hidden; }
+  main { height: 100%; height: 100dvh; padding-bottom: env(safe-area-inset-bottom, 0px); display: flex; flex-direction: column; padding-top: 0; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .stage { flex: 1; min-height: 0; position: relative; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  form { display: flex; gap: 8px; justify-content: center; padding-block: 12px; }
+  canvas { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  input, button { font: inherit; font-size: 16px; color: var(--ink); background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 10px 14px; min-width: 0; }
+  input { flex: 1 1 0; max-width: 260px; }
+  @media (max-width: 480px) { input { max-width: none; } }
+  button { cursor: pointer; }
+  button:hover, input:focus { border-color: var(--ink); }
+  :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+</style>
+</head><body>
+<main>
+  <div class="stage"><canvas id="c" aria-label="Серце, намальоване повторюваним текстом"></canvas></div>
+  <form id="f">
+    <input id="txt" value="I love you" maxlength="30" aria-label="Текст" />
+    
+  </form>
+</main>
+<script>
+(() => {
+  const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+  const input = document.getElementById('txt');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let W, H, dpr, run = 0;
+
+  function size() {
+    dpr = Math.min(devicePixelRatio || 1, 2);
+    const r = cv.getBoundingClientRect();
+    W = r.width; H = r.height;
+    cv.width = W * dpr; cv.height = H * dpr;
+  }
+  const heart = t => ({
+    x: 16 * Math.pow(Math.sin(t), 3),
+    y: -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t))
+  });
+
+  function start() {
+    const id = ++run;
+    size();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    const text = input.value.trim() || 'I love you';
+    const unit = Math.min(W / 36, H / 34);           // px per heart unit
+    const fs = Math.max(9, Math.round(unit * 0.7));
+    ctx.font = fs + 'px Inter, system-ui, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const cx = W / 2, cy = H / 2 - unit * 0.5;
+    const LAYERS = 14, STEP = 0.045, TAU = Math.PI * 2;
+    const perLayer = Math.ceil(TAU / STEP);
+
+    // first a single small text in the centre, like the start of the reel
+    ctx.fillStyle = '#ffb3c1';
+    ctx.fillText(text, cx, cy);
+
+    let layer = 0, i = 0, acc = 0, wait = reduce ? 0 : 60;
+    function put(l, k) {
+      const t = k * STEP;
+      const p = heart(t);
+      const s = 1 - l * 0.016;
+      const wob = l * 0.9;
+      const x = cx + p.x * unit * s + Math.sin(t * 5 + l) * wob * 0.6;
+      const y = cy + p.y * unit * s + Math.cos(t * 3 + l * 2) * wob * 0.4 + l * 0.8;
+      ctx.globalAlpha = l === 0 ? 1 : 0.55;
+      ctx.fillText(text, x, y);
+    }
+    function frame() {
+      if (id !== run) return;
+      if (wait > 0) { wait--; if (wait === 0) ctx.clearRect(0, 0, W, H); requestAnimationFrame(frame); return; }
+      acc += layer === 0 ? 0.6 : 1.5;
+      const speed = Math.floor(acc); acc -= speed;
+      for (let n = 0; n < speed && layer < LAYERS; n++) {
+        put(layer, i);
+        if (++i >= perLayer) { i = 0; layer++; }
+      }
+      if (layer < LAYERS) requestAnimationFrame(frame);
+    }
+    if (reduce) { for (let l = 0; l < LAYERS; l++) for (let k = 0; k < perLayer; k++) put(l, k); }
+    else requestAnimationFrame(frame);
+  }
+
+  document.getElementById('f').addEventListener('submit', e => { e.preventDefault(); start(); });
+  cv.addEventListener('click', start);
+  let rt, lastW = innerWidth; addEventListener('resize', () => { if (innerWidth === lastW) return; lastW = innerWidth; clearTimeout(rt); rt = setTimeout(start, 200); });
+  start();
+})();
+</script>
+</body></html>
